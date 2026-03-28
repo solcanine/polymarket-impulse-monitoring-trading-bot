@@ -15,7 +15,7 @@ import { getClobClient } from "./providers/clobclient";
 import { getProxyWalletBalanceUsd } from "./utils/balance";
 import { loadHoldings } from "./utils/holdings";
 import { tradingEnv, getDefaultImpulseConfig, maskAddress, isValidPrivateKey, isValidEvmAddress } from "./config/env";
-import { logger } from "logger-beauty";
+import { logger } from "./logger";
 
 const POLL_INTERVAL_MS = tradingEnv.IMPULSE_POLL_INTERVAL_MS;
 

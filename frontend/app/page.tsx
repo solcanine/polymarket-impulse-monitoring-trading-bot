@@ -93,12 +93,12 @@ export default function Home() {
 
   return (
     <>
-      <h1 className="sectionTitle">Polymarket Impulse Monitoring Bot Dashboard</h1>
+      <h1 className="sectionTitle">Polymarket Impulse Bot Dashboard</h1>
 
       <div className="statusGrid">
         <div className="card">
           <div className="cardTitle">
-            Up Price {wsConnected ? <span style={{ color: "var(--success)", fontSize: "0.75rem" }}>● live</span> : ""}
+            Up Price {wsConnected ? <span style={{ color: "var(--live)", fontSize: "0.75rem" }}>● live</span> : ""}
           </div>
           <div className="cardValue">
             {displayUpPrice != null ? displayUpPrice.toFixed(3) : "—"}
@@ -106,7 +106,7 @@ export default function Home() {
         </div>
         <div className="card">
           <div className="cardTitle">
-            Down Price {wsConnected ? <span style={{ color: "var(--success)", fontSize: "0.75rem" }}>● live</span> : ""}
+            Down Price {wsConnected ? <span style={{ color: "var(--live)", fontSize: "0.75rem" }}>● live</span> : ""}
           </div>
           <div className="cardValue">
             {displayDownPrice != null ? displayDownPrice.toFixed(3) : "—"}

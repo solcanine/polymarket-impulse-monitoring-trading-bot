@@ -7,8 +7,8 @@ export default function SettingsPage() {
     <>
       <h1 className="sectionTitle">Bot Settings</h1>
       <p style={{ color: "var(--text-secondary)", marginBottom: "var(--space-lg)" }}>
-        Enable/disable the bot and configure impulse detection parameters. Config is stored in MongoDB
-        and applied by the backend on the next poll.
+        Enable/disable the bot and configure impulse detection parameters. Config and live state live in
+        MongoDB (same database as the backend) and are applied on the next poll.
       </p>
       <BotManagement />
     </>

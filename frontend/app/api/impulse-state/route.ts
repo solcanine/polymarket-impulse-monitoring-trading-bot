@@ -1,47 +1,33 @@
 import { NextResponse } from "next/server";
 import { getMongoDB } from "@/lib/db";
 
-type PricePoint = { ts: number; price: number };
-type BotMetaDoc = { _id: string; config?: unknown; enabled?: boolean; updatedAt?: Date } & Record<string, unknown>;
-type PriceRow = { ts: number; price: number };
+type BotStateDoc = {
+  _id: string;
+  upPrice?: number;
+  downPrice?: number;
+  upTokenId?: string;
+  downTokenId?: string;
+  conditionId?: string;
+  position?: unknown;
+  currentSlug?: string;
+  marketStartTime?: number;
+  marketEndTime?: number;
+  walletBalanceUsd?: number;
+  positionValueUsd?: number;
+};
 
-function detectImpulsesMinLookback(
-  history: PricePoint[],
-  side: string,
-  config: { limitPrice: number; minJump: number; lookbackSec: number },
-  existingTs: Set<number>
-): Array<{ ts: number; price: number; side: string; time: string }> {
-  if (history.length < 2) return [];
-
-  const satisfiesAt = (idx: number): boolean => {
-    const p = history[idx];
-    const cutoff = p.ts - config.lookbackSec;
-    let min = Infinity;
-    let count = 0;
-    for (let i = 0; i <= idx; i++) {
-      const h = history[i];
-      if (h.ts < cutoff) continue;
-      count++;
-      if (h.price < min) min = h.price;
-    }
-    if (count < 2 || !Number.isFinite(min)) return false;
-    return p.price >= config.limitPrice && p.price - min >= config.minJump;
-  };
-
-  const out: Array<{ ts: number; price: number; side: string; time: string }> = [];
-  for (let i = 0; i < history.length; i++) {
-    if (!satisfiesAt(i)) continue;
-    if (i > 0 && satisfiesAt(i - 1)) continue; // edge-trigger
-
-    const ts = history[i].ts;
-    // don't duplicate real buys; also de-dupe near any existing marker
-    const nearExisting = [...existingTs].some((t) => Math.abs(t - ts) <= 3);
-    if (nearExisting) continue;
-
-    existingTs.add(ts);
-    out.push({ ts, price: history[i].price, side, time: new Date(ts * 1000).toLocaleTimeString() });
-  }
-  return out;
+async function loadPriceSeries(
+  db: Awaited<ReturnType<typeof getMongoDB>>,
+  tokenId: string,
+  lookbackSec: number
+): Promise<{ ts: number; price: number }[]> {
+  const cutoff = Date.now() / 1000 - lookbackSec;
+  const rows = await db
+    .collection<{ ts: number; price: number }>("impulse_bot_prices")
+    .find({ tokenId, ts: { $gte: cutoff } }, { projection: { _id: 0, ts: 1, price: 1 } })
+    .sort({ ts: 1 })
+    .toArray();
+  return rows.map((r) => ({ ts: r.ts, price: r.price }));
 }
 
 export async function GET(request: Request) {
@@ -50,10 +36,9 @@ export async function GET(request: Request) {
     const includeHistory = searchParams.get("includeHistory") === "1";
 
     const db = await getMongoDB();
-    const stateDoc = await db.collection<BotMetaDoc>("impulse_bot_meta").findOne({ _id: "state" });
-    const state = stateDoc ? ({ ...stateDoc } as Record<string, unknown>) : null;
+    const stateDoc = await db.collection<BotStateDoc>("impulse_bot_meta").findOne({ _id: "state" });
 
-    if (!state) {
+    if (!stateDoc) {
       return NextResponse.json({
         upPrice: null,
         downPrice: null,
@@ -70,32 +55,34 @@ export async function GET(request: Request) {
       });
     }
 
+    const state = {
+      upPrice: stateDoc.upPrice,
+      downPrice: stateDoc.downPrice,
+      upTokenId: stateDoc.upTokenId,
+      downTokenId: stateDoc.downTokenId,
+      conditionId: stateDoc.conditionId,
+      position: stateDoc.position,
+      currentSlug: stateDoc.currentSlug,
+      marketStartTime: stateDoc.marketStartTime,
+      marketEndTime: stateDoc.marketEndTime,
+    };
+
     let priceHistory: { up: { ts: number; price: number }[]; down: { ts: number; price: number }[] } | null = null;
     let impulseEvents: { ts: number; price: number; side: string; time: string }[] = [];
 
-    if (includeHistory && state.upTokenId && state.downTokenId) {
-      // Fetch enough points to cover the visible market window (fallback to 15m).
-      const windowSeconds = typeof state.marketStartTime === "number" && typeof state.marketEndTime === "number"
-        ? Math.max(60, state.marketEndTime - state.marketStartTime)
-        : 900;
-      const cutoff = Date.now() / 1000 - windowSeconds - 30;
+    const configDoc = await db
+      .collection<{ _id: string; config?: { limitPrice?: number; minJump?: number; lookbackSec?: number } }>(
+        "impulse_bot_meta"
+      )
+      .findOne({ _id: "config" });
+    const lookbackSec = configDoc?.config?.lookbackSec ?? 60;
 
-      const [upRows, downRows] = await Promise.all([
-        db
-          .collection("impulse_bot_prices")
-          .find({ tokenId: state.upTokenId, ts: { $gte: cutoff } }, { projection: { _id: 0, ts: 1, price: 1 } })
-          .sort({ ts: 1 })
-          .toArray(),
-        db
-          .collection("impulse_bot_prices")
-          .find({ tokenId: state.downTokenId, ts: { $gte: cutoff } }, { projection: { _id: 0, ts: 1, price: 1 } })
-          .sort({ ts: 1 })
-          .toArray(),
+    if (includeHistory && state.upTokenId && state.downTokenId) {
+      const [up, down] = await Promise.all([
+        loadPriceSeries(db, state.upTokenId, lookbackSec),
+        loadPriceSeries(db, state.downTokenId, lookbackSec),
       ]);
-      priceHistory = {
-        up: (upRows as unknown as PriceRow[]).map((r) => ({ ts: r.ts, price: r.price })),
-        down: (downRows as unknown as PriceRow[]).map((r) => ({ ts: r.ts, price: r.price })),
-      };
+      priceHistory = { up, down };
     }
 
     if (state.conditionId) {
@@ -113,19 +100,54 @@ export async function GET(request: Request) {
     }
 
     if (priceHistory && priceHistory.up.length > 0 && priceHistory.down.length > 0) {
-      const configDoc = await db.collection<BotMetaDoc>("impulse_bot_meta").findOne({ _id: "config" });
-      const cfg = (configDoc?.config ?? {}) as { limitPrice?: number; minJump?: number; lookbackSec?: number };
-      const config = {
-        limitPrice: cfg.limitPrice ?? 0.55,
-        minJump: cfg.minJump ?? 0.05,
-        lookbackSec: cfg.lookbackSec ?? 60,
+      const config = configDoc?.config ?? {};
+      const limitPrice = config.limitPrice ?? 0.55;
+      const minJump = config.minJump ?? 0.05;
+
+      const buyTsSet = new Set(impulseEvents.map((e) => e.ts));
+
+      const JUMP_LOOKBACK_SEC = 2;
+
+      const detectImpulses = (history: { ts: number; price: number }[], side: string) => {
+        const satisfies = (idx: number): boolean => {
+          const p = history[idx];
+          const targetTs = p.ts - JUMP_LOOKBACK_SEC;
+          const beforePoints = history.filter((h) => h.ts <= targetTs);
+          if (beforePoints.length === 0) return false;
+          const prev = beforePoints.reduce((a, b) => (a.ts > b.ts ? a : b));
+          const jump = p.price - prev.price;
+          return p.price >= limitPrice && jump >= minJump;
+        };
+
+        const out: { ts: number; price: number; side: string; time: string }[] = [];
+        for (let i = 0; i < history.length; i++) {
+          const p = history[i];
+          const prevSatisfied = i > 0 && satisfies(i - 1);
+          if (!satisfies(i)) continue;
+          if (prevSatisfied) continue;
+
+          const nearExisting = [...buyTsSet].some((t) => Math.abs(t - p.ts) <= 3);
+          if (!nearExisting) {
+            buyTsSet.add(p.ts);
+            out.push({ ts: p.ts, price: p.price, side, time: new Date(p.ts * 1000).toLocaleTimeString() });
+          }
+        }
+        return out;
       };
 
-      const tsSet = new Set(impulseEvents.map((e) => e.ts));
-      const upImpulses = detectImpulsesMinLookback(priceHistory.up, "Up", config, tsSet);
-      const downImpulses = detectImpulsesMinLookback(priceHistory.down, "Down", config, tsSet);
+      const upImpulses = detectImpulses(priceHistory.up, "Up");
+      const downImpulses = detectImpulses(priceHistory.down, "Down");
       impulseEvents = [...impulseEvents, ...upImpulses, ...downImpulses].sort((a, b) => a.ts - b.ts);
     }
+
+    const walletBalanceUsd =
+      stateDoc?.walletBalanceUsd != null && Number.isFinite(stateDoc.walletBalanceUsd)
+        ? stateDoc.walletBalanceUsd
+        : null;
+    const positionValueUsd =
+      stateDoc?.positionValueUsd != null && Number.isFinite(stateDoc.positionValueUsd)
+        ? stateDoc.positionValueUsd
+        : null;
 
     return NextResponse.json({
       upPrice: state.upPrice ?? null,
@@ -139,8 +161,8 @@ export async function GET(request: Request) {
       marketEndTime: state.marketEndTime ?? null,
       priceHistory,
       impulseEvents,
-      walletBalanceUsd: typeof state.walletBalanceUsd === "number" ? state.walletBalanceUsd : null,
-      positionValueUsd: typeof state.positionValueUsd === "number" ? state.positionValueUsd : null,
+      walletBalanceUsd,
+      positionValueUsd,
     });
   } catch (err) {
     console.error("[api/impulse-state]", err);

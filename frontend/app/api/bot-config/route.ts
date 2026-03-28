@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
+import type { Filter } from "mongodb";
 import { getMongoDB } from "@/lib/db";
 
-type BotMetaDoc = { _id: string; config?: unknown; enabled?: boolean; updatedAt?: Date };
+type MetaId = "enabled" | "config" | "state";
 
 export async function GET() {
   try {
     const db = await getMongoDB();
-    const doc = await db.collection<BotMetaDoc>("impulse_bot_meta").findOne({ _id: "config" });
+    const doc = await db
+      .collection<{ _id: string; config?: Record<string, unknown> }>("impulse_bot_meta")
+      .findOne({ _id: "config" });
     if (!doc?.config) {
       return NextResponse.json({
         config: null,
@@ -38,8 +41,9 @@ export async function POST(request: Request) {
     };
 
     const db = await getMongoDB();
-    await db.collection<BotMetaDoc>("impulse_bot_meta").updateOne(
-      { _id: "config" },
+    const filter: Filter<{ _id: MetaId }> = { _id: "config" };
+    await db.collection<{ _id: MetaId }>("impulse_bot_meta").updateOne(
+      filter,
       { $set: { config, updatedAt: new Date() } },
       { upsert: true }
     );

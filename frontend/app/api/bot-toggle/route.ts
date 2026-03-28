@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import type { Filter } from "mongodb";
 import { getMongoDB } from "@/lib/db";
 
-type BotMetaDoc = { _id: string; config?: unknown; enabled?: boolean; updatedAt?: Date };
+type MetaId = "enabled" | "config" | "state";
 
 export async function POST(request: Request) {
   try {
@@ -9,13 +10,14 @@ export async function POST(request: Request) {
     const enabled = body.enabled === true || body.enabled === "true" || body.enabled === 1;
 
     const db = await getMongoDB();
-    await db.collection<BotMetaDoc>("impulse_bot_meta").updateOne(
-      { _id: "enabled" },
+    const filter: Filter<{ _id: MetaId }> = { _id: "enabled" };
+    await db.collection<{ _id: MetaId }>("impulse_bot_meta").updateOne(
+      filter,
       { $set: { enabled: enabled === true, updatedAt: new Date() } },
       { upsert: true }
     );
 
-    return NextResponse.json({ ok: true, enabled });
+    return NextResponse.json({ ok: true, enabled: enabled === true });
   } catch (err) {
     console.error("[api/bot-toggle]", err);
     return NextResponse.json(

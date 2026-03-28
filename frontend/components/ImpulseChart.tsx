@@ -47,13 +47,13 @@ function ImpulseDot(props: { cx?: number; cy?: number; payload?: PricePoint }) {
   const { cx, cy, payload } = props;
   if (!payload?.impulse || cx == null || cy == null) return null;
   const isUp = payload.impulse.side === "Up";
-  const fill = isUp ? "#22c55e" : "#ef4444"; /* green/red with Polygon purple outline */
+  const fill = isUp ? "var(--chart-up)" : "var(--chart-down)";
   return (
     <g transform={`translate(${cx},${cy})`}>
       <path
         d={POLYGON_HEX}
         fill={fill}
-        stroke="#8247E5"
+        stroke="var(--chart-impulse-ring)"
         strokeWidth={1.5}
       />
     </g>
@@ -77,7 +77,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
         <span style={{ color: "var(--error)" }}>Down:</span> {p.down.toFixed(3)}
       </div>
       {p.impulse && (
-        <div style={{ marginTop: 4, color: "#8247E5" }}>
+        <div style={{ marginTop: 4, color: "var(--chart-impulse-ring)" }}>
           Impulse {p.impulse.side} @ {p.impulse.price.toFixed(3)}
         </div>
       )}
@@ -130,26 +130,25 @@ export function ImpulseChart({
     const impulseByTs = new Map(impulseInWindow.map((e) => [e.ts, e]));
 
     const sorted = Array.from(allTs).sort((a, b) => a - b);
-    const lastFromHistory = (arr: { ts: number; price: number }[]): number | null =>
-      arr.length ? [...arr].sort((a, b) => b.ts - a.ts)[0]?.price ?? null : null;
-
-    let lastUp: number | null = (upPrice != null && Number.isFinite(upPrice)) ? upPrice : lastFromHistory(upFiltered);
-    let lastDown: number | null = (downPrice != null && Number.isFinite(downPrice)) ? downPrice : lastFromHistory(downFiltered);
+    const lastFromHistory = (arr: { ts: number; price: number }[]) =>
+      arr.length ? [...arr].sort((a, b) => b.ts - a.ts)[0]?.price : null;
+    let lastUp = (upPrice != null && Number.isFinite(upPrice))
+      ? upPrice
+      : lastFromHistory(upFiltered);
+    let lastDown = (downPrice != null && Number.isFinite(downPrice))
+      ? downPrice
+      : lastFromHistory(downFiltered);
     if (lastUp == null) lastUp = lastDown != null ? 1 - lastDown : 0.5;
     if (lastDown == null) lastDown = lastUp != null ? 1 - lastUp : 0.5;
-    lastUp = lastUp ?? 0.5;
-    lastDown = lastDown ?? 0.5;
 
     return sorted.map((ts) => {
       const imp = impulseByTs.get(ts);
       const upVal = upMap.get(ts) ?? (imp?.side === "Up" ? imp.price : undefined);
       const downVal = downMap.get(ts) ?? (imp?.side === "Down" ? imp.price : undefined);
-
-      const up = upVal != null && upVal > 0 ? upVal : (lastUp as number);
-      const down = downVal != null && downVal > 0 ? downVal : (lastDown as number);
+      const up = upVal != null && upVal > 0 ? upVal : (lastUp ?? 0.5);
+      const down = downVal != null && downVal > 0 ? downVal : (lastDown ?? 0.5);
       if (upVal != null && upVal > 0) lastUp = upVal;
       if (downVal != null && downVal > 0) lastDown = downVal;
-
       return {
         ts,
         up,
@@ -173,7 +172,11 @@ export function ImpulseChart({
     <div className="card">
       <div className="cardTitle">
         Up / Down Price (current market)
-        {wsConnected && <span style={{ color: "var(--success)", fontSize: "0.75rem", marginLeft: 6 }}>● live</span>}
+        {wsConnected && (
+          <span style={{ color: "var(--live)", fontSize: "0.75rem", marginLeft: 6, fontFamily: "var(--font-body)" }}>
+            ● live
+          </span>
+        )}
       </div>
       <div style={{ height: 280 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -211,7 +214,7 @@ export function ImpulseChart({
             <Line
               type="monotone"
               dataKey="up"
-              stroke="var(--success)"
+              stroke="var(--chart-up)"
               dot={(props) => {
                 const p = props.payload as PricePoint;
                 return p?.impulse && p.impulse.side === "Up" ? (
@@ -226,7 +229,7 @@ export function ImpulseChart({
             <Line
               type="monotone"
               dataKey="down"
-              stroke="var(--error)"
+              stroke="var(--chart-down)"
               dot={(props) => {
                 const p = props.payload as PricePoint;
                 return p?.impulse && p.impulse.side === "Down" ? (
