@@ -244,10 +244,4 @@ Parameters can be set in **`.env`** (defaults / bootstrap) and overridden from t
 
 ---
 
-## ⚠️ Disclaimer
-
-This software is provided **as-is** for **educational and research** purposes. Trading prediction markets involves **financial risk**; past behavior of the bot does not guarantee future results. You are solely responsible for keys, funds, compliance, and any losses. **Never** commit real `.env` files or private keys to version control.
-
----
-
 *Built with TypeScript, MongoDB, and Next.js — happy shipping.* 🚀
