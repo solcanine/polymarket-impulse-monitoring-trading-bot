@@ -195,7 +195,7 @@ Parameters can be set in **`.env`** (defaults / bootstrap) and overridden from t
 
 ### Dashboard
 
-![Dashboard](docs/dashboard.png)
+![Dashboard](assets/dashboard.png)
 
 - Live **Up / Down** prices (WebSocket when connected)  
 - **Position**, **position value**, **wallet balance**, **current market** slug / condition  
@@ -203,7 +203,7 @@ Parameters can be set in **`.env`** (defaults / bootstrap) and overridden from t
 
 ### Settings
 
-![Settings](docs/settings.png)
+![Settings](assets/settings.png)
 
 | Parameter | Default (env) | Description |
 |-----------|----------------|-------------|
