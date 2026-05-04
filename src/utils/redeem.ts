@@ -3,7 +3,7 @@ import { hexZeroPad } from "@ethersproject/bytes";
 import { Wallet } from "@ethersproject/wallet";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { Contract } from "@ethersproject/contracts";
-import { Chain, getContractConfig } from "@polymarket/clob-client";
+import { getContractConfig } from "@polymarket/clob-client-v2";
 import { getClobClient } from "../providers/clobclient";
 import Safe from "@safe-global/protocol-kit";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
@@ -35,14 +35,14 @@ const CTF_ABI = [
 export interface RedeemOptions {
   conditionId: string;
   indexSets?: number[];
-  chainId?: Chain;
+  chainId?: number;
 }
 
 export async function redeemPositions(options: RedeemOptions): Promise<unknown> {
   const privateKey = tradingEnv.PRIVATE_KEY;
   if (!privateKey) throw new Error("PRIVATE_KEY not found");
 
-  const chainId = options.chainId ?? (tradingEnv.CHAIN_ID as Chain);
+  const chainId = options.chainId ?? tradingEnv.CHAIN_ID;
   const config = getContractConfig(chainId);
   const rpcUrl = getRpcUrl(chainId);
   const provider = new JsonRpcProvider(rpcUrl);
@@ -72,7 +72,7 @@ export async function redeemPositions(options: RedeemOptions): Promise<unknown> 
   return tx;
 }
 
-async function redeemPositionsViaSafe(conditionId: string, indexSets: number[], chainIdValue: Chain): Promise<unknown> {
+async function redeemPositionsViaSafe(conditionId: string, indexSets: number[], chainIdValue: number): Promise<unknown> {
   const privateKey = tradingEnv.PRIVATE_KEY;
   if (!privateKey) throw new Error("PRIVATE_KEY not found");
 
@@ -123,11 +123,11 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3, delayMs
   throw lastError;
 }
 
-export async function redeemMarket(conditionId: string, chainId?: Chain, maxRetries = 3): Promise<unknown> {
+export async function redeemMarket(conditionId: string, chainId?: number, maxRetries = 3): Promise<unknown> {
   const privateKey = tradingEnv.PRIVATE_KEY;
   if (!privateKey) throw new Error("PRIVATE_KEY not found");
 
-  const chainIdValue = chainId ?? (tradingEnv.CHAIN_ID as Chain);
+  const chainIdValue = chainId ?? tradingEnv.CHAIN_ID;
   const provider = new JsonRpcProvider(getRpcUrl(chainIdValue));
   const wallet = new Wallet(privateKey, provider);
   const walletAddress = await wallet.getAddress();
@@ -163,7 +163,7 @@ export async function redeemMarket(conditionId: string, chainId?: Chain, maxRetr
 
 export async function checkConditionResolution(
   conditionId: string,
-  chainId?: Chain
+  chainId?: number
 ): Promise<{
   isResolved: boolean;
   winningIndexSets: number[];
@@ -172,7 +172,7 @@ export async function checkConditionResolution(
   outcomeSlotCount: number;
   reason?: string;
 }> {
-  const chainIdValue = chainId ?? (tradingEnv.CHAIN_ID as Chain);
+  const chainIdValue = chainId ?? tradingEnv.CHAIN_ID;
   const config = getContractConfig(chainIdValue);
   const provider = new JsonRpcProvider(getRpcUrl(chainIdValue));
   const wallet = new Wallet(tradingEnv.PRIVATE_KEY!, provider);
@@ -224,9 +224,9 @@ export async function checkConditionResolution(
 export async function getUserTokenBalances(
   conditionId: string,
   walletAddress: string,
-  chainId?: Chain
+  chainId?: number
 ): Promise<Map<number, BigNumber>> {
-  const chainIdValue = chainId ?? (tradingEnv.CHAIN_ID as Chain);
+  const chainIdValue = chainId ?? tradingEnv.CHAIN_ID;
   const config = getContractConfig(chainIdValue);
   const provider = new JsonRpcProvider(getRpcUrl(chainIdValue));
   const wallet = new Wallet(tradingEnv.PRIVATE_KEY!, provider);
@@ -250,13 +250,9 @@ export async function getUserTokenBalances(
         const positionId = await ctf.getPositionId(config.collateral, collectionId);
         const balance = await ctf.balanceOf(walletAddress, positionId);
         if (!balance.isZero()) balances.set(i, balance);
-      } catch {
-        //
-      }
+      } catch {}
     }
-  } catch {
-    //
-  }
+  } catch {}
   return balances;
 }
 

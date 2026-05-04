@@ -1,15 +1,15 @@
 import { readFileSync, existsSync } from "fs";
-import { Chain, ClobClient } from "@polymarket/clob-client";
-import type { ApiKeyCreds } from "@polymarket/clob-client";
+import { Chain, ClobClient, SignatureTypeV2 } from "@polymarket/clob-client-v2";
+import type { ApiKeyCreds } from "@polymarket/clob-client-v2";
 import { Wallet } from "@ethersproject/wallet";
 import { tradingEnv } from "../config/env";
 import { CREDENTIAL_PATH } from "../config/paths";
+import { toClobChain } from "../utils/clobChain";
 
 let cachedClient: ClobClient | null = null;
-let cachedConfig: { chainId: number; host: string } | null = null;
+let cachedConfig: { chain: Chain; host: string } | null = null;
 
 async function ensureCredential(): Promise<void> {
-  // Re-generate when missing OR when the cached credential was created for a different wallet.
   const privateKey = tradingEnv.PRIVATE_KEY;
   if (!privateKey) return;
 
@@ -47,10 +47,10 @@ export async function getClobClient(): Promise<ClobClient> {
 
   const raw = JSON.parse(readFileSync(CREDENTIAL_PATH, "utf-8")) as Partial<ApiKeyCreds> & { walletAddress?: string };
   const creds = raw as ApiKeyCreds;
-  const chainId = tradingEnv.CHAIN_ID as Chain;
+  const chain = toClobChain(tradingEnv.CHAIN_ID);
   const host = tradingEnv.CLOB_API_URL;
 
-  if (cachedClient && cachedConfig && cachedConfig.chainId === chainId && cachedConfig.host === host) {
+  if (cachedClient && cachedConfig && cachedConfig.chain === chain && cachedConfig.host === host) {
     return cachedClient;
   }
 
@@ -66,7 +66,15 @@ export async function getClobClient(): Promise<ClobClient> {
   };
 
   const proxyWalletAddress = tradingEnv.PROXY_WALLET_ADDRESS;
-  cachedClient = new ClobClient(host, chainId, wallet, apiKeyCreds, 2, proxyWalletAddress || undefined);
-  cachedConfig = { chainId, host };
+
+  cachedClient = new ClobClient({
+    host,
+    chain,
+    signer: wallet,
+    creds: apiKeyCreds,
+    signatureType: SignatureTypeV2.POLY_GNOSIS_SAFE,
+    funderAddress: proxyWalletAddress || undefined,
+  });
+  cachedConfig = { chain, host };
   return cachedClient;
 }

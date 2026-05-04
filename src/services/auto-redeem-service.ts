@@ -1,7 +1,3 @@
-/**
- * Auto-redeem service for impulse-bought positions.
- */
-
 import { redeemMarket, isMarketResolved } from "../utils/redeem";
 import { getAllHoldings, clearMarketHoldings } from "../utils/holdings";
 import { tradingEnv, isValidEvmAddress, isValidPrivateKey } from "../config/env";

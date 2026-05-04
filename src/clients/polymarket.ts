@@ -1,7 +1,3 @@
-/**
- * Polymarket API client - generic slug-based
- */
-
 const GAMMA_EVENTS_URL = "https://gamma-api.polymarket.com/events";
 const CLOB_BOOK_URL = "https://clob.polymarket.com/book";
 const CLOB_MIDPOINTS_URL = "https://clob.polymarket.com/midpoints";
@@ -14,10 +10,6 @@ export interface OrderBook {
 import type { GammaEvent, MarketInfo } from "../types";
 
 export class PolymarketClient {
-  /**
-   * Get current or next market from slug prefix and window seconds.
-   * Builds slug as {prefix}-{windowTs}. Always monitors current market; when it ends, auto-switches to next.
-   */
   async getCurrentOrNextEvent(slugPrefix: string, windowSeconds: number): Promise<{
     event: GammaEvent;
     slug: string;
@@ -149,9 +141,7 @@ export class PolymarketClient {
           if (Number.isFinite(n) && n >= 0 && n <= 1) result[id] = n;
         }
       }
-    } catch {
-      //
-    }
+    } catch {}
     return result;
   }
 }

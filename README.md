@@ -56,12 +56,14 @@ The bot implements a **momentum-style impulse** workflow:
 | Layer | Technology |
 |-------|------------|
 | Runtime | Node.js 18+, TypeScript |
-| Trading / data | `@polymarket/clob-client`, WebSocket mid/book updates |
+| Trading / data | [`@polymarket/clob-client-v2`](https://www.npmjs.com/package/@polymarket/clob-client-v2) (CLOB **v2**), REST book/midpoints + WebSocket |
 | Persistence | MongoDB (`impulse_bot_meta`, `impulse_bot_prices`, `impulse_bot_positions`, `impulse_buys`, …) |
 | API & loop | Express + polling impulse monitor (`src/`) |
 | Dashboard | Next.js 14 (`frontend/`, default dev port **3004**) |
 
 **Shared database** — The frontend API routes use the **same** `MONGODB_URI` / `MONGODB_DB` as the bot so the UI and backend always see one source of truth (no Redis).
+
+**Polymarket CLOB v2** — Production trading uses the [CLOB v2 stack](https://docs.polymarket.com/v2-migration) (`https://clob.polymarket.com`). This repo uses the official **v2** TypeScript client. Collateral on Polygon is **pUSD** (wrapped from USDC as needed); the bot approves the **v2 exchange** spender from the SDK’s `getContractConfig`. If you previously ran against CLOB v1, regenerate `credential.json` (see Installation) and let the app refresh on-chain allowances.
 
 ---
 

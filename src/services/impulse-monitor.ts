@@ -1,8 +1,3 @@
-/**
- * Impulse monitor: detect sudden price jumps, run trading loop.
- * Uses RealtimePriceService (WebSocket) for live Up/Down prices.
- */
-
 import { PolymarketClient } from "../clients/polymarket";
 import { MongoDBClient } from "../clients/mongodb";
 import { buyToken } from "./impulse-trading";

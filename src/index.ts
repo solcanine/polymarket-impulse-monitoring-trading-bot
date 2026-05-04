@@ -1,8 +1,3 @@
-/**
- * Polymarket Impulse Monitoring Bot
- * Monitors any market by slug, detects sudden price impulses, buys rising side, trails, hedges on 5% drop.
- */
-
 import "dotenv/config";
 import { PolymarketClient } from "./clients/polymarket";
 import { MongoDBClient } from "./clients/mongodb";

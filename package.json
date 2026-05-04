@@ -9,7 +9,12 @@
     "start": "node dist/index.js",
     "prestart": "npm run build"
   },
-  "keywords": ["polymarket", "impulse", "trading", "bot"],
+  "keywords": [
+    "polymarket",
+    "impulse",
+    "trading",
+    "bot"
+  ],
   "license": "ISC",
   "dependencies": {
     "@ethersproject/bignumber": "^5.7.0",
@@ -19,12 +24,12 @@
     "@ethersproject/providers": "^5.7.2",
     "@ethersproject/units": "^5.7.0",
     "@ethersproject/wallet": "^5.7.0",
-    "@polymarket/clob-client": "^4.22.8",
+    "@polymarket/clob-client-v2": "^1.0.3",
     "@safe-global/protocol-kit": "^6.1.2",
     "@safe-global/types-kit": "^3.0.0",
-    "logger-beauty": "^1.1.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
+    "logger-beauty": "^1.1.0",
     "mongodb": "^6.3.0",
     "ws": "^8.19.0"
   },

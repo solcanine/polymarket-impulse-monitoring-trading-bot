@@ -40,7 +40,6 @@ interface ImpulseChartProps {
   wsConnected?: boolean;
 }
 
-/* Polygon hexagon - points for a small hexagon centered at (0,0) */
 const POLYGON_HEX = "M0,-6 L5.2,-3 L5.2,3 L0,6 L-5.2,3 L-5.2,-3 Z";
 
 function ImpulseDot(props: { cx?: number; cy?: number; payload?: PricePoint }) {

@@ -1,13 +1,9 @@
-/**
- * Impulse trading: market buy for initial and hedge.
- */
-
-import { OrderType, Side } from "@polymarket/clob-client";
+import { OrderType, Side } from "@polymarket/clob-client-v2";
 import { getClobClient } from "../providers/clobclient";
 import { addHoldings } from "../utils/holdings";
 import { validateBuyOrderBalance } from "../utils/balance";
 import { tradingEnv, isValidEvmAddress, isValidPrivateKey } from "../config/env";
-import { logger, shortId } from "../logger";
+import { logger } from "../logger";
 import type { ImpulseBuyDoc, MarketInfo } from "../types";
 import type { MongoDBClient } from "../clients/mongodb";
 
@@ -69,19 +65,18 @@ export async function buyToken(
       return false;
     }
 
-    const order = {
-      tokenID: tokenId,
-      side: Side.BUY,
-      amount: amountUsd,
-      price: orderPrice,
-    };
-
     logger.buy(`${type} ${side}: $${amountUsd.toFixed(2)} @ ${currentPrice.toFixed(2)}`);
 
-    const result = (await (client.createAndPostMarketOrder as (o: unknown, opt: unknown, t: string) => Promise<unknown>)(
-      order,
+    const result = (await client.createAndPostMarketOrder(
+      {
+        tokenID: tokenId,
+        side: Side.BUY,
+        amount: amountUsd,
+        price: orderPrice,
+        orderType: OrderType.FAK,
+      },
       { tickSize: TICK_SIZE, negRisk: NEG_RISK },
-      "FAK"
+      OrderType.FAK
     )) as { status?: string; makingAmount?: string; takingAmount?: string };
 
     const isSuccess =

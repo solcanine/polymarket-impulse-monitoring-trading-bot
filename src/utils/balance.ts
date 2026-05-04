@@ -1,13 +1,13 @@
-import { ClobClient, AssetType } from "@polymarket/clob-client";
+import { ClobClient, AssetType } from "@polymarket/clob-client-v2";
 import { Contract } from "@ethersproject/contracts";
 import { JsonRpcProvider } from "@ethersproject/providers";
-import { getContractConfig } from "@polymarket/clob-client";
+import { getContractConfig } from "@polymarket/clob-client-v2";
 import { tradingEnv, getRpcUrl } from "../config/env";
 import { logger } from "../logger";
 
 const CLOB_DECIMALS = 6;
 const USDC_DECIMALS = 6;
-const USDC_ABI = [
+const ERC20_ABI = [
   "function balanceOf(address account) view returns (uint256)",
   "function allowance(address owner, address spender) view returns (uint256)",
 ];
@@ -28,10 +28,11 @@ async function getProxyOnChainBalanceAllowance(proxyAddress: string): Promise<{
     const chainId = tradingEnv.CHAIN_ID ?? 137;
     const config = getContractConfig(chainId);
     const provider = new JsonRpcProvider(getRpcUrl(chainId));
-    const usdc = new Contract(config.collateral, USDC_ABI, provider);
+    const token = new Contract(config.collateral, ERC20_ABI, provider);
+    const exchangeSpender = config.exchangeV2 || config.exchange;
     const [balanceWei, allowanceWei] = await Promise.all([
-      usdc.balanceOf(proxyAddress),
-      usdc.allowance(proxyAddress, config.exchange),
+      token.balanceOf(proxyAddress),
+      token.allowance(proxyAddress, exchangeSpender),
     ]);
     const balanceUsd = Number(balanceWei.toString()) / Math.pow(10, USDC_DECIMALS);
     const allowanceUsd = Number(allowanceWei.toString()) / Math.pow(10, USDC_DECIMALS);

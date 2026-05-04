@@ -1,8 +1,3 @@
-/**
- * Realtime market price: WebSocket, best bid/ask.
- * Follows trade-bot-v4 MarketPriceStream pattern.
- */
-
 import WebSocket from "ws";
 import { logger, shortId } from "../logger";
 
@@ -123,7 +118,6 @@ export class RealtimePriceService {
     return q ? q.mid : null;
   }
 
-  /** Alias for impulse-monitor: bestAsk or mid for buy-side price */
   getPrice(tokenId: string): number | null {
     const ask = this.getBestAsk(tokenId);
     if (ask != null) return ask;
@@ -243,9 +237,7 @@ export class RealtimePriceService {
           }
           this.notifyPriceUpdate();
         }
-      } catch {
-        // skip
-      }
+      } catch {}
     });
 
     this.ws.on("close", () => {

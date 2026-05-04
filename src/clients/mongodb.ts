@@ -47,13 +47,9 @@ export class MongoDBClient {
     await this.db.collection("redeem_history").createIndex({ redeemedAt: -1 });
     await this.db.collection("redeem_history").createIndex({ conditionId: 1 });
 
-    // Bot "realtime" state formerly stored in Redis.
-    // `_id` is always indexed/unique in MongoDB; no need to create it (and some servers reject `unique` here).
     await this.db.collection<BotPositionDoc>("impulse_bot_positions").createIndex({ updatedAt: -1 });
 
-    // Rolling price history for charts/detection.
     await this.db.collection<BotPricePointDoc>("impulse_bot_prices").createIndex({ tokenId: 1, ts: 1 });
-    // TTL cleanup to prevent unbounded growth; keep ~2 days of data.
     await this.db
       .collection<BotPricePointDoc>("impulse_bot_prices")
       .createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 48 });
@@ -108,8 +104,6 @@ export class MongoDBClient {
     return this.db;
   }
 
-  // ---- Replacements for Redis-backed bot state ----
-
   async getEnabled(): Promise<boolean> {
     const db = this.assertDb();
     const doc = await db.collection<BotEnabledDoc>("impulse_bot_meta").findOne({ _id: "enabled" });
@@ -145,8 +139,8 @@ export class MongoDBClient {
     const db = this.assertDb();
     const doc = await db.collection<BotStateDoc>("impulse_bot_meta").findOne({ _id: "state" });
     if (!doc) return null;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _id, ...rest } = doc;
+    const { _id: _stateId, ...rest } = doc;
+    void _stateId;
     return rest;
   }
 

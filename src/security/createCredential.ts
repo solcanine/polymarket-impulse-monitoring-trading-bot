@@ -1,10 +1,11 @@
-import { ApiKeyCreds, ClobClient, Chain } from "@polymarket/clob-client";
+import { ApiKeyCreds, ClobClient } from "@polymarket/clob-client-v2";
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "fs";
 import { resolve } from "path";
 import { Wallet } from "@ethersproject/wallet";
 import { tradingEnv, maskAddress } from "../config/env";
 import { logger } from "../logger";
 import { CREDENTIAL_PATH } from "../config/paths";
+import { toClobChain } from "../utils/clobChain";
 
 type StoredCredential = ApiKeyCreds & {
   walletAddress?: string;
@@ -32,7 +33,7 @@ export async function createCredential(): Promise<ApiKeyCreds | null> {
   try {
     const wallet = new Wallet(privateKey);
     const currentWallet = wallet.address.toLowerCase();
-    const chainId = tradingEnv.CHAIN_ID as Chain;
+    const chain = toClobChain(tradingEnv.CHAIN_ID);
     const host = tradingEnv.CLOB_API_URL;
 
     const existing = loadFromFile();
@@ -41,7 +42,7 @@ export async function createCredential(): Promise<ApiKeyCreds | null> {
       return existing;
     }
 
-    const clobClient = new ClobClient(host, chainId, wallet);
+    const clobClient = new ClobClient({ host, chain, signer: wallet });
     const credential = await clobClient.createOrDeriveApiKey();
 
     const dir = resolve(process.cwd(), "src/data");
@@ -49,7 +50,7 @@ export async function createCredential(): Promise<ApiKeyCreds | null> {
     const stored: StoredCredential = {
       ...credential,
       walletAddress: wallet.address,
-      chainId: chainId as unknown as number,
+      chainId: tradingEnv.CHAIN_ID,
       host,
     };
     writeFileSync(CREDENTIAL_PATH, JSON.stringify(stored, null, 2));

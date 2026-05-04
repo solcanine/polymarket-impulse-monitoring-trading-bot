@@ -4,14 +4,13 @@ import { parseUnits } from "@ethersproject/units";
 import { Wallet } from "@ethersproject/wallet";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { Contract } from "@ethersproject/contracts";
-import { AssetType, ClobClient } from "@polymarket/clob-client";
-import { getContractConfig } from "@polymarket/clob-client";
+import { AssetType, ClobClient, getContractConfig } from "@polymarket/clob-client-v2";
 import Safe from "@safe-global/protocol-kit";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import { tradingEnv, getRpcUrl } from "../config/env";
 import { logger } from "../logger";
 
-const USDC_ABI = [
+const ERC20_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
   "function allowance(address owner, address spender) external view returns (uint256)",
 ];
@@ -20,7 +19,12 @@ function log(msg: string): void {
   logger.info(msg);
 }
 
-async function approveUsdcOnChainFromSafe(
+function clobExchangeSpender(chainId: number): string {
+  const cfg = getContractConfig(chainId);
+  return cfg.exchangeV2 || cfg.exchange;
+}
+
+async function approveCollateralOnChainFromSafe(
   chainId: number,
   exchangeAddress: string,
   collateralAddress: string,
@@ -31,13 +35,13 @@ async function approveUsdcOnChainFromSafe(
   try {
     const rpcUrl = getRpcUrl(chainId);
     const provider = new JsonRpcProvider(rpcUrl);
-    const usdc = new Contract(collateralAddress, USDC_ABI, provider);
-    const current = await usdc.allowance(proxyAddress, exchangeAddress);
+    const token = new Contract(collateralAddress, ERC20_ABI, provider);
+    const current = await token.allowance(proxyAddress, exchangeAddress);
     if (current.gte(MaxUint256)) {
-      log("Approve: proxy (Safe) USDC allowance already MaxUint256");
+      log("Approve: proxy (Safe) collateral allowance already MaxUint256");
       return true;
     }
-    const data = usdc.interface.encodeFunctionData("approve", [exchangeAddress, MaxUint256]);
+    const data = token.interface.encodeFunctionData("approve", [exchangeAddress, MaxUint256]);
     const safeSdk = await Safe.init({
       provider: rpcUrl,
       signer: privateKey.startsWith("0x") ? privateKey : "0x" + privateKey,
@@ -50,7 +54,7 @@ async function approveUsdcOnChainFromSafe(
     });
     const signed = await safeSdk.signTransaction(safeTx);
     const result = await safeSdk.executeTransaction(signed);
-    log(`Approve: proxy (Safe) USDC approve tx sent: ${result.hash}`);
+    log(`Approve: proxy (Safe) collateral approve tx sent: ${result.hash}`);
     await provider.waitForTransaction(result.hash, 1, 90_000).catch(() => {});
     return true;
   } catch (e: unknown) {
@@ -59,7 +63,7 @@ async function approveUsdcOnChainFromSafe(
   }
 }
 
-async function approveUsdcOnChain(
+async function approveCollateralOnChain(
   chainId: number,
   exchangeAddress: string,
   collateralAddress: string,
@@ -81,12 +85,12 @@ async function approveUsdcOnChain(
       gasPrice = parseUnits("30", "gwei");
     }
 
-    const usdc = new Contract(collateralAddress, USDC_ABI, wallet);
-    const tx = await usdc.approve(exchangeAddress, MaxUint256, {
+    const token = new Contract(collateralAddress, ERC20_ABI, wallet);
+    const tx = await token.approve(exchangeAddress, MaxUint256, {
       gasLimit: 100_000,
       gasPrice,
     });
-    log(`Approve: on-chain USDC approve tx sent: ${tx.hash}`);
+    log(`Approve: on-chain collateral approve tx sent: ${tx.hash}`);
     await tx.wait(1);
     log("Approve: on-chain tx confirmed");
     return true;
@@ -96,7 +100,7 @@ async function approveUsdcOnChain(
       log(`Approve: on-chain approve skipped (may already be set): ${msg}`);
       return true;
     }
-    log(`Approve: on-chain USDC approve failed: ${msg}`);
+    log(`Approve: on-chain collateral approve failed: ${msg}`);
     return false;
   }
 }
@@ -116,14 +120,15 @@ export async function runApprove(client: ClobClient | null): Promise<boolean> {
 
   try {
     const config = getContractConfig(chainId);
+    const exchangeSpender = clobExchangeSpender(chainId);
     if (!rpcConfigured) {
       log("Approve: RPC not configured (RPC_URL/RPC_TOKEN missing) — skipping on-chain approve");
     } else {
       if (proxyAddress) {
-        log("Approve: proxy (Safe) set — approving from Safe");
-        await approveUsdcOnChainFromSafe(chainId, config.exchange, config.collateral, key, proxyAddress);
+        log("Approve: proxy (Safe) set — approving collateral for CLOB exchange");
+        await approveCollateralOnChainFromSafe(chainId, exchangeSpender, config.collateral, key, proxyAddress);
       }
-      await approveUsdcOnChain(chainId, config.exchange, config.collateral, key);
+      await approveCollateralOnChain(chainId, exchangeSpender, config.collateral, key);
     }
   } catch (e) {
     log(`Approve: on-chain approve step failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -132,7 +137,7 @@ export async function runApprove(client: ClobClient | null): Promise<boolean> {
   if (typeof client.updateBalanceAllowance !== "function") return true;
   try {
     await client.updateBalanceAllowance({ asset_type: AssetType.COLLATERAL });
-    log("Approve: collateral (USDC) API allowance updated");
+    log("Approve: collateral API allowance updated (CLOB v2)");
     await new Promise((r) => setTimeout(r, 2000));
     await client.updateBalanceAllowance({ asset_type: AssetType.COLLATERAL });
   } catch (e) {

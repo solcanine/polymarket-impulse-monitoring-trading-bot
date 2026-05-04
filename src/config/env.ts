@@ -16,7 +16,6 @@ export function maskAddress(addr: string): string {
 }
 
 export function isValidPrivateKey(privateKey: string | undefined): boolean {
-  // ethers Wallet expects a 32-byte hex string, typically `0x` prefixed.
   if (!privateKey) return false;
   const v = privateKey.trim();
   return /^0x[a-fA-F0-9]{64}$/.test(v);
@@ -95,7 +94,6 @@ export function getRpcUrl(chainId: number): string {
   }
   if (chainId === 137) {
     if (tradingEnv.RPC_TOKEN) return `https://polygon-mainnet.g.alchemy.com/v2/${tradingEnv.RPC_TOKEN}`;
-    // Safe public default (no embedded API key). Override via RPC_URL or RPC_TOKEN for reliability.
     return "https://rpc.ankr.com/polygon";
   }
   if (chainId === 80002) {
